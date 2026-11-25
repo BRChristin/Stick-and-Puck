@@ -1,0 +1,60 @@
+name: Update stick & puck schedules
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"   # every 30 minutes (GitHub may run it a few minutes late)
+  workflow_dispatch:          # "Run workflow" button on the Actions tab
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write              # lets the keep-alive step re-enable this schedule
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Pull sessions from every rink
+        run: node scraper/fetch-sessions.mjs site/sessions.json
+        env:
+          PREVIOUS_URL: ${{ steps.pages.outputs.base_url }}/sessions.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      # GitHub pauses scheduled workflows after 60 days without commits.
+      # Re-enabling it on every scheduled run keeps it going with no commits needed.
+      - name: Keep schedule alive
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update.yml/enable"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

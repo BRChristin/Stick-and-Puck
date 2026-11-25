@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stick &amp; Puck Finder</title>
+<meta name="description" content="Every stick and puck session at Puget Sound rinks, one day at a time.">
+<meta name="theme-color" content="#0c1d2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stick &amp; Puck">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #eef3f7;
+    --card: #ffffff;
+    --ink: #0f1f2e;
+    --ink-2: #4a5d70;
+    --ink-3: #8597a8;
+    --line: #dde5ec;
+    --head: #0c1d2e;
+    --head-ink: #f2f7fb;
+    --accent: #12a8a3;
+    --accent-ink: #ffffff;
+    --good: #1f9d55;
+    --warn: #d98a12;
+    --bad: #d2463c;
+    --chip: #e4ebf1;
+    --shadow: 0 1px 2px rgba(15, 31, 46, .06), 0 4px 14px rgba(15, 31, 46, .05);
+    --radius: 16px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #08121c;
+      --card: #102030;
+      --ink: #e8f0f6;
+      --ink-2: #a5b6c6;
+      --ink-3: #6d8296;
+      --line: #1d3245;
+      --head: #050d15;
+      --chip: #17293b;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+    :root[data-theme="dark"] {
+      --bg: #08121c;
+      --card: #102030;
+      --ink: #e8f0f6;
+      --ink-2: #a5b6c6;
+      --ink-3: #6d8296;
+      --line: #1d3245;
+      --head: #050d15;
+      --chip: #17293b;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
+    min-height: 100vh;
+    overscroll-behavior-y: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  a { color: inherit; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+
+  /* ---------- header ---------- */
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--head); color: var(--head-ink);
+    padding: calc(var(--safe-top) + 12px) 0 0;
+    box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 0 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand svg { width: 30px; height: 30px; flex: none; }
+  .brand h1 { font-size: 19px; letter-spacing: -.01em; margin: 0; font-weight: 700; }
+  .brand small { display: block; font-size: 12px; color: #8fb3c9; font-weight: 500; letter-spacing: .02em; }
+  .brand .spacer { flex: 1; }
+  .iconbtn {
+    width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+    background: rgba(255,255,255,.08); position: relative;
+  }
+  .iconbtn svg { width: 20px; height: 20px; }
+  .iconbtn .badge {
+    position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; border-radius: 9px;
+    background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; padding: 0 4px;
+  }
+
+  /* date strip */
+  .days {
+    display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity;
+    padding: 14px 16px 12px; margin: 0 auto; max-width: 620px;
+    scrollbar-width: none;
+  }
+  .days::-webkit-scrollbar { display: none; }
+  .day {
+    flex: none; width: 54px; padding: 7px 0 8px; border-radius: 14px; text-align: center;
+    scroll-snap-align: center; color: #b9cfdd; background: rgba(255,255,255,.05);
+    transition: background .15s, color .15s, transform .15s;
+  }
+  .day .dow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .day .dom { font-size: 20px; font-weight: 700; line-height: 1.15; color: #fff; }
+  .day .cnt { font-size: 11px; font-weight: 600; margin-top: 2px; height: 14px; }
+  .day.empty .dom, .day.empty .cnt { color: #5d7a8f; }
+  .day.today .dow { color: var(--accent); }
+  .day[aria-selected="true"] { background: var(--accent); color: #e6fffd; }
+  .day[aria-selected="true"] .dow, .day[aria-selected="true"] .dom, .day[aria-selected="true"] .cnt { color: #fff; }
+  .day:active { transform: scale(.96); }
+  .monthmark { flex: none; align-self: center; writing-mode: vertical-rl; transform: rotate(180deg);
+    font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #5d7a8f; font-weight: 700; }
+
+  /* ---------- toolbar ---------- */
+  .toolbar { padding: 14px 0 4px; }
+  .dayhead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .dayhead h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+  .dayhead .sub { color: var(--ink-2); font-size: 13px; white-space: nowrap; }
+  .seg {
+    display: grid; grid-template-columns: repeat(4, 1fr); background: var(--chip); border-radius: 12px; padding: 3px; margin-top: 12px;
+  }
+  .seg button { padding: 7px 0; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px 2px; margin: 0 -16px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px 6px 9px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; background: var(--card); border: 1px solid var(--line); color: var(--ink);
+  }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); display: block; }
+  .chip[aria-pressed="false"] { background: transparent; color: var(--ink-3); border-style: dashed; }
+  .chip[aria-pressed="false"] i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+
+  /* ---------- list ---------- */
+  main { padding-bottom: calc(var(--safe-bot) + 40px); }
+  .bucket { margin: 18px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); display: flex; gap: 8px; align-items: center; }
+  .bucket::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .earlier { width: 100%; margin-top: 14px; padding: 10px; border-radius: 12px; border: 1px dashed var(--line); color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .card {
+    display: grid; grid-template-columns: 62px 1fr auto; grid-template-rows: auto auto; gap: 0 12px; align-items: start;
+    background: var(--card); border-radius: var(--radius); padding: 14px 14px 14px 0; margin-bottom: 10px;
+    box-shadow: var(--shadow); text-decoration: none; position: relative; overflow: hidden;
+    border-left: 5px solid var(--c);
+    animation: rise .22s ease-out both;
+  }
+  .card:active { transform: scale(.99); }
+  .card.past { opacity: .5; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  .t { text-align: right; padding-top: 1px; grid-row: 1 / 3; }
+  .t b { display: block; font-size: 20px; line-height: 1.05; letter-spacing: -.02em; }
+  .t span { font-size: 11px; font-weight: 700; color: var(--ink-2); letter-spacing: .04em; }
+  .t em { display: block; font-style: normal; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+  .info { min-width: 0; }
+  .rinkname { font-weight: 700; font-size: 16px; letter-spacing: -.01em; line-height: 1.2; }
+  .meta { color: var(--ink-2); font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--chip); color: var(--ink-2); }
+  .tag.now { background: rgba(31,157,85,.14); color: var(--good); }
+  .tag.soon { background: rgba(217,138,18,.14); color: var(--warn); }
+  .tag.stale { background: rgba(210,70,60,.12); color: var(--bad); }
+  .avail { grid-column: 2; grid-row: 2; margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+  .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; max-width: 160px; }
+  .bar > div { height: 100%; border-radius: 3px; background: var(--good); width: 0; transition: width .4s ease; }
+  .bar.mid > div { background: var(--warn); }
+  .bar.high > div { background: var(--bad); }
+  .avail strong { color: var(--ink); }
+  .go { grid-column: 3; grid-row: 1 / 3; align-self: center; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--chip); color: var(--ink-2); }
+  .go svg { width: 16px; height: 16px; }
+  .pill { grid-column: 3; grid-row: 1 / 3; align-self: center; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+  .pill.full { background: rgba(210,70,60,.14); color: var(--bad); }
+  .pill.closed { background: var(--chip); color: var(--ink-3); }
+
+  .empty-state { text-align: center; padding: 48px 12px 24px; color: var(--ink-2); }
+  .empty-state svg { width: 64px; height: 64px; opacity: .5; }
+  .empty-state h3 { color: var(--ink); margin: 10px 0 4px; font-size: 18px; }
+  .btn { display: inline-block; margin-top: 14px; padding: 10px 16px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 700; text-decoration: none; }
+  .btn.ghost { background: var(--chip); color: var(--ink); }
+
+  footer { color: var(--ink-3); font-size: 12px; text-align: center; padding: 18px 16px calc(var(--safe-bot) + 26px); line-height: 1.6; }
+  footer .live { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 4px; vertical-align: 1px; animation: pulse 2s infinite; }
+  footer .warn { color: var(--bad); }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* rink sheet */
+  dialog {
+    border: 0; padding: 0; width: 100%; max-width: 620px; margin: auto auto 0; border-radius: 22px 22px 0 0;
+    background: var(--card); color: var(--ink); max-height: 85vh;
+  }
+  dialog::backdrop { background: rgba(5, 13, 21, .55); backdrop-filter: blur(2px); }
+  dialog[open] { animation: up .22s ease-out; }
+  @keyframes up { from { transform: translateY(40px); opacity: 0; } }
+  .sheet { padding: 10px 18px calc(var(--safe-bot) + 18px); }
+  .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 12px; }
+  .sheet h3 { margin: 0 0 2px; font-size: 18px; }
+  .sheet p { margin: 0 0 12px; color: var(--ink-2); font-size: 13px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+  .row:last-of-type { border-bottom: 0; }
+  .row .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); flex: none; }
+  .row .nm { flex: 1; min-width: 0; }
+  .row .nm b { display: block; font-size: 15px; }
+  .row .nm span { font-size: 12px; color: var(--ink-2); }
+  .switch { width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; flex: none; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+  .switch[aria-checked="true"] { background: var(--accent); }
+  .switch[aria-checked="true"]::after { transform: translateX(18px); }
+  .sheet .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .sheet .actions .btn { flex: 1; text-align: center; margin: 0; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 2px 4px; font-weight: 600; }
+
+  .skeleton { height: 92px; border-radius: var(--radius); background: linear-gradient(90deg, var(--card), var(--chip), var(--card)); background-size: 200% 100%; animation: sh 1.2s infinite; margin-bottom: 10px; }
+  @keyframes sh { to { background-position: -200% 0; } }
+  @media (min-width: 700px) { .card:hover { box-shadow: 0 4px 22px rgba(15,31,46,.12); } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap brand">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#12a8a3"/><path d="M16 14l15 26h17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="44" cy="46" rx="8" ry="3.4" fill="#0c1d2e"/></svg>
+    <div><h1>Stick &amp; Puck</h1><small>Puget Sound ice finder</small></div>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="todayBtn" aria-label="Jump to today" title="Today">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="12" cy="15.5" r="1.6" fill="currentColor"/></svg>
+    </button>
+    <button class="iconbtn" id="filterBtn" aria-label="Choose rinks" title="Rinks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      <span class="badge" id="filterBadge" hidden></span>
+    </button>
+  </div>
+  <nav class="days" id="days" role="tablist" aria-label="Choose a day"></nav>
+</header>
+
+<main class="wrap">
+  <section class="toolbar">
+    <div class="dayhead"><h2 id="dayTitle">Loading…</h2><span class="sub tnum" id="daySub"></span></div>
+    <div class="seg" id="seg" role="group" aria-label="Time of day">
+      <button data-t="all" aria-pressed="true">All day</button>
+      <button data-t="am" aria-pressed="false">Morning</button>
+      <button data-t="mid" aria-pressed="false">Afternoon</button>
+      <button data-t="pm" aria-pressed="false">Evening</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+  <section id="list" aria-live="polite">
+    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+  </section>
+</main>
+<footer id="foot"></footer>
+
+<dialog id="sheet">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Rinks</h3>
+    <p>Pick the rinks you'd actually drive to. Saved on this device.</p>
+    <div id="rinkRows"></div>
+    <div class="toggle-row"><span>Hide full sessions</span><button class="switch" id="hideFull" role="switch" aria-checked="false" aria-label="Hide full sessions"></button></div>
+    <div class="actions">
+      <button class="btn ghost" id="allOn">Select all</button>
+      <button class="btn" id="doneBtn">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const TZ = "America/Los_Angeles";
+  const DATA_URL = "sessions.json";
+  const STORE = "snp:v1";
+  const $ = (id) => document.getElementById(id);
+
+  let data = null;          // sessions.json payload
+  let rinksById = {};
+  let selected = null;      // "YYYY-MM-DD"
+  let showEarlier = false;
+  let lastLive = 0;
+  const liveDone = new Map(); // date -> timestamp of last live refresh
+  const prefs = Object.assign({ off: [], tod: "all", hideFull: false }, safeRead());
+
+  function safeRead() { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(prefs)); } catch {} }
+
+  // ---------- time helpers (always Pacific time, regardless of phone settings) ----------
+  function nowPT() {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(new Date()).map((x) => [x.type, x.value]));
+    return { date: `${p.year}-${p.month}-${p.day}`, min: (+p.hour) * 60 + (+p.minute) };
+  }
+  const toMin = (hm) => { const [h, m] = hm.split(":").map(Number); return h * 60 + m; };
+  function addDays(ymd, n) { const [y, m, d] = ymd.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); }
+  const asDate = (ymd) => { const [y, m, d] = ymd.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d, 12)); };
+  const fmt = (ymd, opts) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(asDate(ymd));
+  function clock(hm) { let [h, m] = hm.split(":").map(Number); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return { t: `${h}:${String(m).padStart(2, "0")}`, ap }; }
+  function dur(s) { let d = toMin(s.end) - toMin(s.start); if (d < 0) d += 1440; return d >= 60 ? `${Math.floor(d / 60)}h${d % 60 ? ` ${d % 60}m` : ""}` : `${d} min`; }
+  function ago(iso) {
+    const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (m < 1) return "just now"; if (m < 60) return `${m} min ago`;
+    const h = Math.round(m / 60); return h < 24 ? `${h} hr ago` : `${Math.round(h / 24)} days ago`;
+  }
+  const bucketOf = (hm) => { const m = toMin(hm); return m < 720 ? "am" : m < 1020 ? "mid" : "pm"; };
+  const BUCKET_NAME = { am: "Morning", mid: "Afternoon", pm: "Evening" };
+
+  // ---------- filtering ----------
+  function isFull(s) { return s.capacity != null && s.registered != null && s.registered >= s.capacity; }
+  function visible(s, ignoreTod) {
+    if (prefs.off.includes(s.rink)) return false;
+    if (!ignoreTod && prefs.tod !== "all" && bucketOf(s.start) !== prefs.tod) return false;
+    if (prefs.hideFull && isFull(s)) return false;
+    return true;
+  }
+  function isPast(s) { const n = nowPT(); return s.date < n.date || (s.date === n.date && toMin(s.end) <= n.min); }
+  const sessionsOn = (d) => data.sessions.filter((s) => s.date === d && visible(s));
+
+  // ---------- rendering ----------
+  function dayRange() {
+    const today = nowPT().date;
+    const last = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), addDays(today, 13));
+    const out = []; for (let d = today; d <= last && out.length < 42; d = addDays(d, 1)) out.push(d);
+    return out;
+  }
+
+  function renderDays() {
+    const today = nowPT().date;
+    const nav = $("days"); nav.innerHTML = "";
+    let prevMonth = null;
+    for (const d of dayRange()) {
+      const month = d.slice(0, 7);
+      if (prevMonth && month !== prevMonth) {
+        const mm = document.createElement("span"); mm.className = "monthmark"; mm.textContent = fmt(d, { month: "short" }); nav.append(mm);
+      }
+      prevMonth = month;
+      const n = sessionsOn(d).filter((s) => !isPast(s)).length;
+      const b = document.createElement("button");
+      b.className = "day" + (d === today ? " today" : "") + (n ? "" : " empty");
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", String(d === selected));
+      b.dataset.d = d;
+      b.innerHTML = `<div class="dow">${d === today ? "Today" : fmt(d, { weekday: "short" })}</div><div class="dom tnum">${fmt(d, { day: "numeric" })}</div><div class="cnt tnum">${n ? n : "–"}</div>`;
+      b.onclick = () => select(d);
+      nav.append(b);
+    }
+    const cur = nav.querySelector('[aria-selected="true"]');
+    if (cur) cur.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }
+
+  function renderChips() {
+    const wrap = $("chips"); wrap.innerHTML = "";
+    for (const r of data.rinks) {
+      const on = !prefs.off.includes(r.id);
+      const b = document.createElement("button");
+      b.className = "chip"; b.style.setProperty("--c", r.color);
+      b.setAttribute("aria-pressed", String(on));
+      b.innerHTML = `<i></i>${r.short}`;
+      b.onclick = () => { toggleRink(r.id); };
+      wrap.append(b);
+    }
+    const off = prefs.off.length;
+    $("filterBadge").hidden = !off; $("filterBadge").textContent = String(data.rinks.length - off);
+  }
+
+  function toggleRink(id) {
+    prefs.off = prefs.off.includes(id) ? prefs.off.filter((x) => x !== id) : [...prefs.off, id];
+    save(); renderAll();
+  }
+
+  function card(s) {
+    const r = rinksById[s.rink] || { name: s.rink, color: "#888", city: "" };
+    const a = clock(s.start), b = clock(s.end);
+    const n = nowPT();
+    const past = isPast(s);
+    const onNow = s.date === n.date && toMin(s.start) <= n.min && n.min < toMin(s.end);
+    const mins = toMin(s.start) - n.min;
+    const soon = s.date === n.date && mins > 0 && mins <= 90;
+
+    const tags = [];
+    if (onNow) tags.push(`<span class="tag now">On ice now</span>`);
+    else if (soon) tags.push(`<span class="tag soon">Starts in ${mins} min</span>`);
+    for (const t of s.tags || []) tags.push(`<span class="tag">${esc(t)}</span>`);
+    if (s.stale) tags.push(`<span class="tag stale">May be outdated</span>`);
+
+    let avail, right;
+    const goIcon = `<span class="go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>`;
+    if (s.source === "daysmart" && s.capacity) {
+      const pct = Math.min(100, Math.round((s.registered / s.capacity) * 100));
+      const open = Math.max(0, s.capacity - s.registered);
+      const cls = pct >= 90 ? "high" : pct >= 60 ? "mid" : "";
+      avail = `<div class="bar ${cls}"><div style="width:${Math.max(pct, s.registered ? 4 : 0)}%"></div></div><span class="tnum"><strong>${s.registered}</strong> / ${s.capacity} signed up${open && !past ? ` · ${open} open` : ""}</span>`;
+      right = isFull(s) ? `<span class="pill full">Full</span>` : s.status === "closed" && !past ? `<span class="pill closed">Closed</span>` : goIcon;
+    } else if (s.source === "bond") {
+      avail = `<span>Walk-up · pay at the front desk</span>`;
+      right = goIcon;
+    } else {
+      avail = s.spotsLeft != null ? `<span class="tnum"><strong>${s.spotsLeft}</strong> spots left · book online</span>` : `<span>Book online · headcount not shown</span>`;
+      right = goIcon;
+    }
+    const place = s.sheet && s.sheet !== r.name ? s.sheet.replace(new RegExp(`^${r.city}\\s+`, "i"), "") : "";
+    // Only show the session title when it says something beyond "Stick & Puck".
+    const extra = s.title.replace(/stick\s*(&|and|n|'n'?)\s*puck/i, "").replace(/drop[\s-]*in|\b(LIC|OVA|KCI)\b|[()\-–·:]/gi, "").trim();
+    const title = extra ? ` · ${esc(s.title)}` : "";
+
+    return `<a class="card${past ? " past" : ""}" style="--c:${r.color}" href="${esc(s.url)}" target="_blank" rel="noopener">
+      <div class="t tnum"><b>${a.t}</b><span>${a.ap}</span></div>
+      <div class="info">
+        <div class="rinkname">${esc(r.name)}</div>
+        <div class="meta tnum">until ${b.t} ${b.ap} · ${dur(s)}${place ? ` · ${esc(place)}` : ""}${title}</div>
+        ${tags.length ? `<div class="tags">${tags.join("")}</div>` : ""}
+      </div>
+      ${right}
+      <div class="avail">${avail}</div>
+    </a>`;
+  }
+
+  function esc(x) { return String(x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  function renderList() {
+    const list = $("list");
+    const today = nowPT().date;
+    $("dayTitle").textContent = selected === today ? "Today" : selected === addDays(today, 1) ? "Tomorrow" : fmt(selected, { weekday: "long" });
+    const all = sessionsOn(selected);
+    const past = all.filter(isPast), upcoming = all.filter((s) => !isPast(s));
+    $("daySub").textContent = `${fmt(selected, { month: "short", day: "numeric" })} · ${upcoming.length} session${upcoming.length === 1 ? "" : "s"}`;
+
+    let html = "";
+    if (past.length) {
+      html += `<button class="earlier" id="earlierBtn">${showEarlier ? "Hide" : "Show"} ${past.length} earlier session${past.length === 1 ? "" : "s"}</button>`;
+    }
+    const shown = showEarlier ? all : upcoming;
+    let lastB = null;
+    for (const s of shown) {
+      const bk = bucketOf(s.start);
+      if (bk !== lastB) { html += `<div class="bucket">${BUCKET_NAME[bk]}</div>`; lastB = bk; }
+      html += card(s);
+    }
+    if (!upcoming.length) html += emptyState(all.length > 0);
+    list.innerHTML = html;
+    const eb = $("earlierBtn"); if (eb) eb.onclick = () => { showEarlier = !showEarlier; renderList(); };
+    const nb = $("nextBtn"); if (nb) nb.onclick = () => select(nb.dataset.d);
+  }
+
+  function emptyState(hadEarlier) {
+    const days = dayRange();
+    const next = days.find((d) => d > selected && sessionsOn(d).some((s) => !isPast(s)));
+    const filtered = prefs.off.length || prefs.tod !== "all" || prefs.hideFull;
+    const nextCount = next ? sessionsOn(next).length : 0;
+    return `<div class="empty-state">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M14 12l16 28h18"/><ellipse cx="44" cy="48" rx="9" ry="4"/></svg>
+      <h3>${hadEarlier ? "That's it for today" : "No stick & puck"}</h3>
+      <div>${filtered ? "Nothing matches your filters on this day." : "No sessions are posted for this day yet."}</div>
+      ${next ? `<button class="btn" id="nextBtn" data-d="${next}">Next: ${fmt(next, { weekday: "short", month: "short", day: "numeric" })} · ${nextCount}</button>` : ""}
+    </div>`;
+  }
+
+  function renderFoot() {
+    const bad = data.sources.filter((s) => !s.ok);
+    const liveNote = lastLive ? `<span class="live"></span>Signup counts live from DaySmart · ` : "";
+    $("foot").innerHTML = `${data.note ? `<span class="warn">${esc(data.note)}</span><br>` : ""}${liveNote}Schedules updated ${ago(data.generatedAt)}<br>
+      ${bad.length ? `<span class="warn">Couldn't reach ${bad.map((b) => esc(b.name.split(" ")[0])).join(", ")} last run. Showing the last good copy.</span><br>` : ""}
+      Tap a session to book on the rink's site. Always confirm there; rinks change ice on short notice.`;
+  }
+
+  function renderSheet() {
+    const rows = $("rinkRows"); rows.innerHTML = "";
+    for (const r of data.rinks) {
+      const on = !prefs.off.includes(r.id);
+      const n = data.sessions.filter((s) => s.rink === r.id && !isPast(s)).length;
+      const row = document.createElement("div"); row.className = "row"; row.style.setProperty("--c", r.color);
+      row.innerHTML = `<span class="dot"></span><span class="nm"><b>${esc(r.name)}</b><span>${esc(r.city)} · ${n} upcoming</span></span><button class="switch" role="switch" aria-checked="${on}" aria-label="${esc(r.name)}"></button>`;
+      row.querySelector("button").onclick = () => { toggleRink(r.id); renderSheet(); };
+      rows.append(row);
+    }
+    $("hideFull").setAttribute("aria-checked", String(prefs.hideFull));
+  }
+
+  function renderSeg() {
+    for (const b of $("seg").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.t === prefs.tod));
+  }
+
+  function renderAll() { renderChips(); renderSeg(); renderDays(); renderList(); renderFoot(); }
+
+  function select(d) {
+    if (!d) return;
+    selected = d; showEarlier = false;
+    history.replaceState(null, "", `#${d}`);
+    renderDays(); renderList();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    refreshLive(d);
+  }
+
+  // ---------- live signup counts straight from DaySmart ----------
+  async function refreshLive(d) {
+    if (Date.now() - (liveDone.get(d) || 0) < 60000) return;
+    liveDone.set(d, Date.now());
+    const byCo = {};
+    for (const s of data.sessions) if (s.date === d && s.live) (byCo[s.live.company] ||= []).push(s);
+    let changed = false;
+    await Promise.all(Object.entries(byCo).map(async ([co, list]) => {
+      try {
+        const q = new URLSearchParams({ "cache[save]": "false", "page[size]": "100", include: "summary",
+          "filter[id__in]": list.map((s) => s.live.eventId).join(","), "filter[unconstrained]": "1", company: co });
+        const r = await fetch(`https://api.daysmartrecreation.com/v1/events?${q}`, { headers: { Accept: "application/vnd.api+json" } });
+        if (!r.ok) return;
+        const j = await r.json();
+        const sums = {}; for (const i of j.included || []) if (i.type === "event-summaries") sums[i.id] = i.attributes;
+        for (const s of list) {
+          const a = sums[s.live.eventId]; if (!a) continue;
+          if (a.registered_count != null) { s.registered = a.registered_count; changed = true; }
+          if (a.composite_capacity) s.capacity = a.composite_capacity;
+          if (a.registration_status) s.status = a.registration_status;
+        }
+        lastLive = Date.now();
+      } catch { /* offline or blocked: keep the scheduled copy */ }
+    }));
+    if (changed && d === selected) { renderList(); renderFoot(); }
+  }
+
+  // ---------- data ----------
+  async function load(first) {
+    try {
+      const r = await fetch(`${DATA_URL}?t=${Date.now()}`, { cache: "no-store" });
+      data = await r.json();
+    } catch (e) {
+      if (first) $("list").innerHTML = `<div class="empty-state"><h3>Couldn't load schedules</h3><div>Check your connection and pull to refresh.</div></div>`;
+      return;
+    }
+    rinksById = Object.fromEntries(data.rinks.map((r) => [r.id, r]));
+    const today = nowPT().date;
+    const fromHash = location.hash.slice(1);
+    if (!selected) selected = /^\d{4}-\d{2}-\d{2}$/.test(fromHash) && fromHash >= today ? fromHash : today;
+    if (selected < today) selected = today;
+    liveDone.clear();
+    renderAll(); renderSheet();
+    refreshLive(selected);
+  }
+
+  // ---------- events ----------
+  $("seg").onclick = (e) => { const t = e.target.closest("button")?.dataset.t; if (!t) return; prefs.tod = t; save(); renderAll(); };
+  $("todayBtn").onclick = () => select(nowPT().date);
+  $("filterBtn").onclick = () => { renderSheet(); $("sheet").showModal(); };
+  $("doneBtn").onclick = () => $("sheet").close();
+  $("allOn").onclick = () => { prefs.off = []; save(); renderAll(); renderSheet(); };
+  $("hideFull").onclick = () => { prefs.hideFull = !prefs.hideFull; save(); renderSheet(); renderAll(); };
+  $("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) $("sheet").close(); });
+
+  // Swipe left/right on the list to change days.
+  let sx = 0, sy = 0, st = 0;
+  const main = document.querySelector("main");
+  main.addEventListener("touchstart", (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
+  main.addEventListener("touchend", (e) => {
+    const t = e.changedTouches[0]; const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.8 && Date.now() - st < 600) step(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  document.addEventListener("keydown", (e) => {
+    if ($("sheet").open) return;
+    if (e.key === "ArrowRight") step(1); else if (e.key === "ArrowLeft") step(-1);
+  });
+  window.addEventListener("hashchange", () => {
+    const h = location.hash.slice(1);
+    if (data && /^\d{4}-\d{2}-\d{2}$/.test(h) && h !== selected && h >= nowPT().date) select(h);
+  });
+  function step(n) { const days = dayRange(); const i = days.indexOf(selected); const d = days[i + n]; if (d) select(d); }
+
+  // Keep it fresh when you come back to the tab / home-screen app.
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && data && Date.now() - new Date(data.generatedAt) > 5 * 60000) load(false); });
+  setInterval(() => { if (!document.hidden && data) { renderList(); renderFoot(); } }, 60000);
+
+  load(true);
+})();
+</script>
+</body>
+</html>
