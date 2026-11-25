@@ -22,19 +22,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
-
-      - id: pages
-        uses: actions/configure-pages@v5
 
       - name: Pull sessions from every rink
         run: node scraper/fetch-sessions.mjs site/sessions.json
         env:
-          PREVIOUS_URL: ${{ steps.pages.outputs.base_url }}/sessions.json
+          PREVIOUS_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/sessions.json
+
+      - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
